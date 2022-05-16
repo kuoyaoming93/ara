@@ -325,7 +325,7 @@ int main(void)
                         else if ((i == cam1[j]) || (i == cam2[j]))
                             oRmn_temp = min1[j];
                         else
-                            oRmn_temp = voto * dQ_min2;
+                            oRmn_temp = dQ_min2;//voto * dQ_min2;
                     }
                     
                     temp[j][i] = exp_pos_table[gfadd[temp[j][i]][beta]]-1;
@@ -336,7 +336,7 @@ int main(void)
                             if(Rmn[temp[j][i]][i] > CN_SATp1)
                                 Rmn[temp[j][i]][i] = CN_SATp1;
                     #else
-                        Rmn[temp[j][i]][i] = oRmn_temp*scaling_factor;
+                        Rmn[temp[j][i]][i] = oRmn_temp;//*scaling_factor;
                     #endif
                 }
 

@@ -42,42 +42,42 @@ int main(void)
     //float sigma[10];
     //float sigma_2[10];
 
-    int16_t 	decoded[N_code][m_field];
+    int64_t 	decoded[N_code][m_field];
     //float 	r_ch[N_code][m_field];
     //float 	Ln_aux[q_field][N_code];
-    int16_t 	Rmn_SRL[M_code][q_field][dc];
+    int64_t 	Rmn_SRL[M_code][q_field][dc];
 
-    int16_t Qmn[q_field][dc];
-    int16_t Qmn_temp[q_field];
+    int64_t Qmn[q_field][dc];
+    int64_t Qmn_temp[q_field];
 
-    int16_t aux1, aux2;
-    int16_t MAX_temp; //MAX_temp2;
+    int64_t aux1, aux2;
+    int64_t MAX_temp; //MAX_temp2;
 
-    int16_t dQ_min1, dQ_min2; 
-    int16_t dQ_pos1, dQ_pos2;
+    int64_t dQ_min1, dQ_min2; 
+    int64_t dQ_pos1, dQ_pos2;
 
-    int16_t beta;
-    int16_t z[dc];
-    int16_t dWmn[q_field][dc];
-    int16_t temp[q_field][dc];
-    int16_t min1[q_field], min2[q_field];
-    int16_t pos[q_field];
-    int16_t max[q_field/2];
-    int16_t cam1_temp[q_field/2 - 1], cam2_temp[q_field/2 - 1];
-    int16_t min_global[q_field]; //min2_global[q_field];
-    int16_t cam1[q_field], cam2[q_field];
-    int16_t Rmn[q_field][dc];
-    int16_t Qn_NEW[q_field][dc];
+    int64_t beta;
+    int64_t z[dc];
+    int64_t dWmn[q_field][dc];
+    int64_t temp[q_field][dc];
+    int64_t min1[q_field], min2[q_field];
+    int64_t pos[q_field];
+    int64_t max[q_field/2];
+    int64_t cam1_temp[q_field/2 - 1], cam2_temp[q_field/2 - 1];
+    int64_t min_global[q_field]; //min2_global[q_field];
+    int64_t cam1[q_field], cam2[q_field];
+    int64_t Rmn[q_field][dc];
+    int64_t Qn_NEW[q_field][dc];
 
-    int16_t H_decoded[it_max];
+    int64_t H_decoded[it_max];
     int MNBE_Hdecoded[it_max];
     int MNPE_Hdecoded[it_max];
 
-    int16_t min_temp;
-	int16_t min_temp2;
-	int16_t pos_temp;
+    int64_t min_temp;
+	int64_t min_temp2;
+	int64_t pos_temp;
 
-	int16_t oRmn_temp;
+	int64_t oRmn_temp;
 
     //int error = 0;
 
@@ -328,7 +328,7 @@ int main(void)
                         else if ((i == cam1[j]) || (i == cam2[j]))
                             oRmn_temp = min1[j];
                         else
-                            oRmn_temp = voto * dQ_min2;
+                            oRmn_temp = dQ_min2;// voto * dQ_min2;
                     }
                     
                     temp[j][i] = exp_pos_table[gfadd[temp[j][i]][beta]]-1;
@@ -339,7 +339,7 @@ int main(void)
                             if(Rmn[temp[j][i]][i] > CN_SATp1)
                                 Rmn[temp[j][i]][i] = CN_SATp1;
                     #else
-                        Rmn[temp[j][i]][i] = oRmn_temp*scaling_factor;
+                        Rmn[temp[j][i]][i] = oRmn_temp;//*scaling_factor;
                     #endif
                 }
 
