@@ -13,9 +13,11 @@
 #include "CNU_tables_GF16.h"
 #include "Hmat_N32_M16_GF16.h"
 
+//#define VECTOR_EXT
+
 //#include "input.h"
 
-int Ln_aux[16][32] = {
+int64_t Ln_aux[16][32] = {
     {6,2,7,0,5,0,3,2,11,4,0,1,6,5,3,4,6,7,9,1,5,12,2,1,12,3,3,2,2,4,4,5},
     {0,0,9,0,4,2,6,3,7,7,3,5,2,2,6,6,5,6,6,0,3,9,3,3,8,0,4,6,6,2,8,1},
     {9,1,4,3,3,0,0,4,6,2,2,3,5,8,4,0,10,4,5,4,4,9,1,0,8,4,5,5,1,2,3,4}, 
@@ -89,6 +91,9 @@ int main(void)
     }*/
 
     printf("Hola! \n");
+    unsigned long int block_size_p;
+    // Set the vector configuration
+    asm volatile("vsetvli %0, %1, e64, m2, ta, ma" : "=r"(block_size_p) : "r"(q_field));
 
     /* Inicialize Rmn_SRL to zero values */
     for (i = 0; i<M_code; i++)
@@ -116,10 +121,16 @@ int main(void)
                 aux2 = pow_coefH[row][i] + 1;
                 aux1 = q_field - aux2;
 
+#ifdef VECTOR_EXT
+                asm volatile("addi	t0, zero, 256;");
+                asm volatile("vlse64.v v2, (%0), t0;" ::"r"(&Ln_aux[0][col[row][i]]));
+                asm volatile("vse64.v v2, (%0);" ::"r"(&Qmn_temp[0]));
+#else
                 for (j=0;j<q_field;j++)
                 {
                     Qmn_temp[j] = Ln_aux[j][col[row][i]];
                 }
+#endif                
 
                 /* PERMUTACION DE LA COLUMNA EXTRAIDA */
 
