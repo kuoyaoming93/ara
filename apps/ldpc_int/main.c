@@ -13,7 +13,7 @@
 #include "CNU_tables_GF16.h"
 #include "Hmat_N32_M16_GF16.h"
 
-//#define VECTOR_EXT
+#define VECTOR_EXT
 
 //#include "input.h"
 
@@ -122,24 +122,26 @@ int main(void)
                 aux1 = q_field - aux2;
 
 #ifdef VECTOR_EXT
-                asm volatile("addi	t0, zero, 256;");
+                asm volatile("addi	t0, zero, 256;");  // 64 (int64_t) * 32 (columns) / 8 
                 asm volatile("vlse64.v v2, (%0), t0;" ::"r"(&Ln_aux[0][col[row][i]]));
                 asm volatile("vse64.v v2, (%0);" ::"r"(&Qmn_temp[0]));
 #else
                 for (j=0;j<q_field;j++)
-                {
                     Qmn_temp[j] = Ln_aux[j][col[row][i]];
-                }
 #endif                
 
                 /* PERMUTACION DE LA COLUMNA EXTRAIDA */
 
                 if (pow_coefH[row][i]==0)
                 {
+#ifdef VECTOR_EXT    
+                    asm volatile("vle64.v v2, (%0);" ::"r"(&Qmn_temp[0]));
+                    asm volatile("addi	t0, zero, 32;"); // 64 (int64_t) * 32 (columns) / 8 
+                    asm volatile("vsse64.v v2, (%0), t0;" ::"r"(&Qmn[0][i]));
+#else                
                     for (j=0;j<q_field;j++)
-                    {
                         Qmn[j][i] = Qmn_temp[j];
-                    }
+#endif                     
                 }
                 else
                 {		                
