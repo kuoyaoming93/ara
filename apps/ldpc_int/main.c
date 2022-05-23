@@ -99,7 +99,7 @@ int main(void)
     for (i = 0; i<M_code; i++)
         for (j=0; j<q_field; j++)
             for (k=0; k<dc; k++)
-                Rmn_SRL[i][j][k] = 0.0;
+                Rmn_SRL[i][j][k] = 0;
 
     for (var=0; var<it_max; var++)
         H_decoded[var] = 0;
