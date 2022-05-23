@@ -442,7 +442,10 @@ int main(void)
                 /***********************************/
 
                 /* PRECISION FINITA Y ACTUALIZACION DE LAS VN*/
-
+//#ifdef VECTOR_EXT  
+                //asm volatile("addi	t0, zero, %0;" :: "I"(256));  // 64 (int64_t) * 32 (columns) / 8 
+                //asm volatile("vsse64.v v2, (%0), t0;" ::"r"(&Ln_aux[0][col[row][i]]));
+//#else
                 for (j=0;j<q_field;j++)
                 {
                     #if DECO_QUANT == 1
@@ -453,7 +456,7 @@ int main(void)
                         Ln_aux[j][col[row][i]] = Qn_NEW[j][i];
                     #endif
                 }
-
+//#endif
             }
 
             /******* TEMPORAL *************/
