@@ -149,7 +149,9 @@ int main(void)
                     asm volatile("vadd.vv v2, v6, v10;");
                 }
                 asm volatile("addi	t0, zero, %0;" :: "I"(32)); // 64 (int64_t) * 32 (columns) / 8 
-                asm volatile("vsse64.v v2, (%0), t0;" ::"r"(&Qmn[0][i]));   
+                
+                // Save Qmn in v2
+                //asm volatile("vsse64.v v2, (%0), t0;" ::"r"(&Qmn[0][i]));   
 #else
 
                 for (j=0;j<q_field;j++)
@@ -386,6 +388,36 @@ int main(void)
 
                 /****** PERMUTACION INVERSA *******/
                 aux1 = pow_coefH[row][i];
+                aux2 = q_field - aux1;
+#ifdef VECTOR_EXT               
+                asm volatile("addi	t0, zero, %0;" :: "I"(32));  // 64 (int64_t) * 4 (columns) / 8 
+                asm volatile("vlse64.v v2, (%0), t0;" ::"r"(&Rmn[0][i]));
+                if (aux1!=0)
+                {
+                    // Clean vectors     
+                    asm volatile("vmv.v.i v0, 0;");
+                    asm volatile("vmv.v.i v4, 0;");
+                    asm volatile("vmv.v.i v6, 0;");
+                    asm volatile("vmv.v.i v8, 0;");
+                    asm volatile("vmv.v.i v10, 0;");
+
+                    // Permutation and clean position 0
+                    asm volatile("vslidedown.vi v0, v2, 1;");
+                    asm volatile("vslideup.vx v4, v0, %0;" :: "r"(aux2));                
+                    asm volatile("vslidedown.vx v6, v2, %0;" :: "r"(aux1+1));
+                    asm volatile("vslideup.vx v8, v6, %0;" :: "r"(1));   
+                    asm volatile("vadd.vv v6, v4, v8;");
+
+                    // Set position 0
+                    asm volatile("vmv.v.x v8, %0;" :: "r"(Ln_aux[0][col[row][i]]));
+                    asm volatile("vslidedown.vx v10, v8, %0;" :: "r"(q_field-1));
+
+                    // Merge both vectors
+                    asm volatile("vadd.vv v2, v6, v10;");
+                }
+                asm volatile("addi	t0, zero, %0;" :: "I"(32)); // 64 (int64_t) * 32 (columns) / 8 
+                asm volatile("vsse64.v v2, (%0), t0;" ::"r"(&Qn_NEW[0][i]));   
+#else 
                 if (aux1==0) /* Si hmn es diferente de 0 o 1 entonces se permuta*/
                 {
                     for (j=0;j<q_field;j++)
@@ -406,6 +438,7 @@ int main(void)
 
                     Qn_NEW[0][i] = Rmn[0][i];
                 }
+#endif                
                 /***********************************/
 
                 /* PRECISION FINITA Y ACTUALIZACION DE LAS VN*/
