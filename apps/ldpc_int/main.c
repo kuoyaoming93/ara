@@ -121,27 +121,45 @@ int main(void)
                 aux2 = pow_coefH[row][i] + 1;
                 aux1 = q_field - aux2;
 
-#ifdef VECTOR_EXT
-                asm volatile("addi	t0, zero, 256;");  // 64 (int64_t) * 32 (columns) / 8 
-                asm volatile("vlse64.v v2, (%0), t0;" ::"r"(&Ln_aux[0][col[row][i]]));
-                asm volatile("vse64.v v2, (%0);" ::"r"(&Qmn_temp[0]));
-#else
-                for (j=0;j<q_field;j++)
-                    Qmn_temp[j] = Ln_aux[j][col[row][i]];
-#endif                
-
                 /* PERMUTACION DE LA COLUMNA EXTRAIDA */
+#ifdef VECTOR_EXT                
+                asm volatile("addi	t0, zero, %0;" :: "I"(256));  // 64 (int64_t) * 32 (columns) / 8 
+                asm volatile("vlse64.v v2, (%0), t0;" ::"r"(&Ln_aux[0][col[row][i]]));
+                if (pow_coefH[row][i]!=0)
+                {
+                    // Clean vectors     
+                    asm volatile("vmv.v.i v0, 0;");
+                    asm volatile("vmv.v.i v4, 0;");
+                    asm volatile("vmv.v.i v6, 0;");
+                    asm volatile("vmv.v.i v8, 0;");
+                    asm volatile("vmv.v.i v10, 0;");
+
+                    // Permutation and clean position 0
+                    asm volatile("vslidedown.vi v0, v2, 1;");
+                    asm volatile("vslideup.vx v4, v0, %0;" :: "r"(aux2));                
+                    asm volatile("vslidedown.vx v6, v2, %0;" :: "r"(aux1+1));
+                    asm volatile("vslideup.vx v8, v6, %0;" :: "r"(1));   
+                    asm volatile("vadd.vv v6, v4, v8;");
+
+                    // Set position 0
+                    asm volatile("vmv.v.x v8, %0;" :: "r"(Ln_aux[0][col[row][i]]));
+                    asm volatile("vslidedown.vx v10, v8, %0;" :: "r"(q_field-1));
+
+                    // Merge both vectors
+                    asm volatile("vadd.vv v2, v6, v10;");
+                }
+                asm volatile("addi	t0, zero, %0;" :: "I"(32)); // 64 (int64_t) * 32 (columns) / 8 
+                asm volatile("vsse64.v v2, (%0), t0;" ::"r"(&Qmn[0][i]));   
+#else
+
+                for (j=0;j<q_field;j++)
+                    Qmn_temp[j] = Ln_aux[j][col[row][i]];            
+
 
                 if (pow_coefH[row][i]==0)
                 {
-#ifdef VECTOR_EXT    
-                    asm volatile("vle64.v v2, (%0);" ::"r"(&Qmn_temp[0]));
-                    asm volatile("addi	t0, zero, 32;"); // 64 (int64_t) * 32 (columns) / 8 
-                    asm volatile("vsse64.v v2, (%0), t0;" ::"r"(&Qmn[0][i]));
-#else                
                     for (j=0;j<q_field;j++)
-                        Qmn[j][i] = Qmn_temp[j];
-#endif                     
+                        Qmn[j][i] = Qmn_temp[j];                 
                 }
                 else
                 {		                
@@ -155,6 +173,7 @@ int main(void)
                     }
                     Qmn[0][i] = Qmn_temp[0];
                 }
+#endif                
 
                 /***********************************/
 

@@ -100,7 +100,7 @@ int main(void)
     {						
         //printf("Iteracion %d\n",var);
         printf("iter: %d\n", var);
-        /* Loop through all rows of parity check matrix */
+        /* Loop through all rows of parity check matrix */        
         for (row=0; row<M_code; row++)
         {
 
