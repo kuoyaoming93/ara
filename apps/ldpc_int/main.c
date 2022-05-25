@@ -101,7 +101,7 @@ int main(void)
 #ifdef FOR_BACK
 	int a;
 	int64_t R_Forward[q_field][dc], R_Backward[q_field][dc];
-    int64_t R_compare[q_field], R_compare_2[q_field];
+    int64_t R_compare[q_field], R_compare_2[q_field], R_compare_3[q_field];
     int64_t min_temp, min_temp_2, min_temp_3;
 #endif    
 
@@ -277,13 +277,13 @@ int main(void)
                         // Standard Min Max
                         // Search maximum
                         if(R_Forward[k][a-2] > R_Backward[wires[k][i]][a])
-                                R_compare[k] = R_Forward[k][a-2];
+                                R_compare_3[k] = R_Forward[k][a-2];
                             else
-                                R_compare[k] = R_Backward[wires[k][i]][a];
+                                R_compare_3[k] = R_Backward[wires[k][i]][a];
                         
                         // Search minimum
-                        if(R_compare[k] < min_temp_3)
-                            min_temp_3 = R_compare[k];
+                        if(R_compare_3[k] < min_temp_3)
+                            min_temp_3 = R_compare_3[k];
                     }
                     R_Forward[i][a-1] = min_temp;
                     R_Backward[i][4-a] = min_temp_2;
