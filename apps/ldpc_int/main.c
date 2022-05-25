@@ -240,22 +240,10 @@ int main(void)
 #ifdef FOR_BACK
             // Clean Forward and Backward variables and set value to first and last column
             // Clean R_Aux
-            for(j=0;j<dc;j++){
-                for(i=0;i<q_field;i++){        
-                    if(j==0)
-                        R_Forward[i][j] = Qmn[i][j];
-                    else
-                        R_Forward[i][j] = 0;
-
-                    if(j==dc-1){
-                        R_Backward[i][j] = Qmn[i][j];
-                        Rmn[i][j] = Qmn[i][j];
-                    }
-                    else{
-                        R_Backward[i][j] = 0;
-                        Rmn[i][j] = 0;
-                    }            
-                }
+            for(i=0;i<q_field;i++){        
+                R_Forward[i][0] = Qmn[i][0];
+                R_Backward[i][dc-1] = Qmn[i][dc-1];
+                Rmn[i][dc-1] = Qmn[i][dc-1];
             }
 
             for(a=2;a<dc;a++){
