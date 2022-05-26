@@ -71,6 +71,17 @@ package ara_pkg;
   localparam int unsigned LatFNonComp     = 'd1;
   localparam int unsigned LatFConv        = 'd2;
 
+  // Define the maximum instruction queue depth
+  localparam MaxVInsnQueueDepth = 4;
+  // FUs instruction queue depth.
+  localparam int unsigned MfpuInsnQueueDepth = 4;
+  localparam int unsigned ValuInsnQueueDepth = 4;
+  localparam int unsigned VlduInsnQueueDepth = 4;
+  localparam int unsigned VstuInsnQueueDepth = 4;
+  localparam int unsigned SlduInsnQueueDepth = 2;
+  // Ara supports MaskuInsnQueueDepth = 1 only.
+  localparam int unsigned MaskuInsnQueueDepth = 1;
+
   ///////////////////
   //  Definitions  //
   ///////////////////
@@ -91,6 +102,8 @@ package ara_pkg;
     VSLL, VSRL, VSRA, VNSRL, VNSRA,
     // Merge
     VMERGE,
+    // Integer Reductions
+    VREDSUM, VREDAND, VREDOR, VREDXOR, VREDMINU, VREDMIN, VREDMAXU, VREDMAX, VWREDSUMU, VWREDSUM,
     // Mul/Mul-Add
     VMUL, VMULH, VMULHU, VMULHSU, VMACC, VNMSAC, VMADD, VNMSUB,
     // Div
@@ -125,6 +138,12 @@ package ara_pkg;
     is_store = op inside {[VSE:VSXE]};
   endfunction : is_store
 
+  typedef enum logic [1:0] {
+    NO_RED,
+    ALU_RED,
+    MFPU_RED
+  } sldu_mux_e;
+
   ////////////////////////
   //  Width conversion  //
   ////////////////////////
@@ -136,7 +155,7 @@ package ara_pkg;
   // an element of width SEW for the functional units. The operand queues support the following
   // type conversions:
 
-  localparam int unsigned NumConversions = 9;
+  localparam int unsigned NumConversions = 10;
 
   typedef enum logic [$clog2(NumConversions)-1:0] {
     OpQueueConversionNone,
@@ -147,6 +166,7 @@ package ara_pkg;
     OpQueueConversionZExt8,
     OpQueueConversionSExt8,
     OpQueueConversionWideFP2,
+    OpQueueReductionZExt,
     OpQueueAdjustFPCvt
   } opqueue_conversion_e;
   // OpQueueAdjustFPCvt is introduced to support widening FP conversions, to comply with the
@@ -154,10 +174,12 @@ package ara_pkg;
 
   // The FPU needs to know if, during the conversion, there is also a width change
   // Moreover, the operand requester treats widening instructions differently for handling WAW
+  // CVT_WIDE is equal to 2'b00 since these bits are reused with reductions
+  // (this is a hack to save wires)
   typedef enum logic [1:0] {
-    CVT_SAME,
-    CVT_WIDE,
-    CVT_NARROW
+    CVT_WIDE   = 2'b00,
+    CVT_SAME   = 2'b01,
+    CVT_NARROW = 2'b10
   } resize_e;
 
   // Floating-Point structs for re-encoding during widening FP operations
@@ -248,6 +270,10 @@ package ara_pkg;
     vlen_t vl;
     vlen_t vstart;
     rvv_pkg::vtype_t vtype;
+
+    // Request token, for registration in the sequencer
+    logic token;
+
   } ara_req_t;
 
   typedef struct packed {
@@ -256,6 +282,9 @@ package ara_pkg;
 
     // Instruction triggered an error
     logic error;
+
+    // New value for vstart
+    vlen_t error_vl;
   } ara_resp_t;
 
   ////////////////////
@@ -277,7 +306,7 @@ package ara_pkg;
   // scale also are with index given by NrLanes plus the following offset.
   //
   // The load and the store unit must be at the beginning of this enumeration.
-  typedef enum {
+  typedef enum logic [1:0] {
     OffsetLoad, OffsetStore, OffsetMask, OffsetSlide
   } vfu_offset_e;
 
@@ -806,6 +835,12 @@ package ara_pkg;
     vaddr = vid * (VLENB / NrLanes / 8);
   endfunction: vaddr
 
+  // Differenciate between SLDU and ADDRGEN operands from opqueue
+  typedef enum logic {
+    SLDU    = 1'b0,
+    ADDRGEN = 1'b1
+  } target_fu_e;
+
   // This is the interface between the lane's sequencer and the operand request stage, which
   // makes consecutive requests to the vector elements inside the VRF.
   typedef struct packed {
@@ -820,6 +855,8 @@ package ara_pkg;
     rvv_pkg::vew_e eew;        // Effective element width
     opqueue_conversion_e conv; // Type conversion
 
+    target_fu_e target_fu;     // Target FU of the opqueue (if it is not clear)
+
     // Vector machine metadata
     rvv_pkg::vtype_t vtype;
     vlen_t vl;
@@ -833,6 +870,8 @@ package ara_pkg;
     rvv_pkg::vew_e eew;        // Effective element width
     vlen_t vl;                 // Vector length
     opqueue_conversion_e conv; // Type conversion
+    logic [1:0] ntr_red;       // Neutral bits for reductions
+    target_fu_e target_fu;     // Target FU of the opqueue (if it is not clear)
   } operand_queue_cmd_t;
 
   // This is the interface between the lane's sequencer and the lane's VFUs.

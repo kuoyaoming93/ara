@@ -233,6 +233,9 @@ module ara_dispatcher import ara_pkg::*; import rvv_pkg::*; #(
     is_config            = 1'b0;
     ignore_zero_vl_check = 1'b0;
 
+    // The token must change at every new instruction
+    ara_req_d.token = (ara_req_valid_o && ara_req_ready_i) ? ~ara_req_o.token : ara_req_o.token;
+
     // Special states
     case (state_q)
       // Is Ara idle?
@@ -506,6 +509,24 @@ module ara_dispatcher import ara_pkg::*; import rvv_pkg::*; #(
                       LMUL_RSVD: illegal_insn = 1'b1;
                       default:;
                     endcase
+                  end
+                  // Reductions encode in cvt_resize the neutral value bits
+                  // CVT_WIDE is 2'b00 (hack to save wires)
+                  6'b110000: begin
+                    ara_req_d.op = ara_pkg::VWREDSUMU;
+                    ara_req_d.emul           = next_lmul(vtype_q.vlmul);
+                    ara_req_d.vtype.vsew     = vtype_q.vsew.next();
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.conversion_vs2 = OpQueueConversionZExt2;
+                    ara_req_d.cvt_resize     = CVT_WIDE;
+                  end
+                  6'b110001: begin
+                    ara_req_d.op = ara_pkg::VWREDSUM;
+                    ara_req_d.emul           = next_lmul(vtype_q.vlmul);
+                    ara_req_d.vtype.vsew     = vtype_q.vsew.next();
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.conversion_vs2 = OpQueueConversionSExt2;
+                    ara_req_d.cvt_resize     = CVT_WIDE;
                   end
                   default: illegal_insn = 1'b1;
                 endcase
@@ -925,6 +946,48 @@ module ara_dispatcher import ara_pkg::*; import rvv_pkg::*; #(
 
                 // Decode based on the func6 field
                 unique case (insn.varith_type.func6)
+                  // Encode, for each reduction, the bits of the neutral
+                  // value of each operation
+                  6'b000000: begin
+                    ara_req_d.op             = ara_pkg::VREDSUM;
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.cvt_resize     = resize_e'(2'b00);
+                  end
+                  6'b000001: begin
+                    ara_req_d.op             = ara_pkg::VREDAND;
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.cvt_resize     = resize_e'(2'b11);
+                  end
+                  6'b000010: begin
+                    ara_req_d.op             = ara_pkg::VREDOR;
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.cvt_resize     = resize_e'(2'b00);
+                  end
+                  6'b000011: begin
+                    ara_req_d.op             = ara_pkg::VREDXOR;
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.cvt_resize     = resize_e'(2'b00);
+                  end
+                  6'b000100: begin
+                    ara_req_d.op             = ara_pkg::VREDMINU;
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.cvt_resize     = resize_e'(2'b11);
+                  end
+                  6'b000101: begin
+                    ara_req_d.op             = ara_pkg::VREDMIN;
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.cvt_resize     = resize_e'(2'b01);
+                  end
+                  6'b000110: begin
+                    ara_req_d.op             = ara_pkg::VREDMAXU;
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.cvt_resize     = resize_e'(2'b00);
+                  end
+                  6'b000111: begin
+                    ara_req_d.op             = ara_pkg::VREDMAX;
+                    ara_req_d.conversion_vs1 = OpQueueReductionZExt;
+                    ara_req_d.cvt_resize     = resize_e'(2'b10);
+                  end
                   6'b011000: begin
                     ara_req_d.op        = ara_pkg::VMANDNOT;
                     ara_req_d.use_vd_op = 1'b1;
@@ -1985,11 +2048,40 @@ module ara_dispatcher import ara_pkg::*; import rvv_pkg::*; #(
             ara_req_valid_d     = 1'b1;
 
             // Decode the element width
+            // Indexed memory operations follow a different rule
             unique case ({insn.vmem_type.mew, insn.vmem_type.width})
-              4'b0000: ara_req_d.vtype.vsew = EW8;
-              4'b0101: ara_req_d.vtype.vsew = EW16;
-              4'b0110: ara_req_d.vtype.vsew = EW32;
-              4'b0111: ara_req_d.vtype.vsew = EW64;
+              4'b0000: begin
+                  if (insn.vmem_type.mop != 2'b01 && insn.vmem_type.mop != 2'b11) begin
+                    ara_req_d.vtype.vsew = EW8;
+                  end else begin
+                    ara_req_d.vtype.vsew = vtype_q.vsew;
+                    ara_req_d.eew_vs2    = EW8;
+                  end
+              end
+              4'b0101: begin
+                  if (insn.vmem_type.mop != 2'b01 && insn.vmem_type.mop != 2'b11) begin
+                    ara_req_d.vtype.vsew = EW16;
+                  end else begin
+                    ara_req_d.vtype.vsew = vtype_q.vsew;
+                    ara_req_d.eew_vs2    = EW16;
+                  end
+              end
+              4'b0110: begin
+                  if (insn.vmem_type.mop != 2'b01 && insn.vmem_type.mop != 2'b11) begin
+                    ara_req_d.vtype.vsew = EW32;
+                  end else begin
+                    ara_req_d.vtype.vsew = vtype_q.vsew;
+                    ara_req_d.eew_vs2    = EW32;
+                  end
+              end
+              4'b0111: begin
+                  if (insn.vmem_type.mop != 2'b01 && insn.vmem_type.mop != 2'b11) begin
+                    ara_req_d.vtype.vsew = EW64;
+                  end else begin
+                    ara_req_d.vtype.vsew = vtype_q.vsew;
+                    ara_req_d.eew_vs2    = EW64;
+                  end
+              end
               default: begin // Invalid. Element is too wide, or encoding is non-existant.
                 acc_req_ready_o  = 1'b1;
                 acc_resp_o.error = 1'b1;
@@ -2128,6 +2220,9 @@ module ara_dispatcher import ara_pkg::*; import rvv_pkg::*; #(
               acc_resp_o.error = ara_resp_i.error;
               acc_resp_valid_o = 1'b1;
               ara_req_valid_d  = 1'b0;
+              // In case of error, modify vstart
+              if (ara_resp_i.error)
+                vstart_d = ara_resp_i.error_vl;
             end
           end
 
@@ -2157,11 +2252,40 @@ module ara_dispatcher import ara_pkg::*; import rvv_pkg::*; #(
             ara_req_valid_d     = 1'b1;
 
             // Decode the element width
+            // Indexed memory operations follow a different rule
             unique case ({insn.vmem_type.mew, insn.vmem_type.width})
-              4'b0000: ara_req_d.vtype.vsew = EW8;
-              4'b0101: ara_req_d.vtype.vsew = EW16;
-              4'b0110: ara_req_d.vtype.vsew = EW32;
-              4'b0111: ara_req_d.vtype.vsew = EW64;
+              4'b0000: begin
+                  if (insn.vmem_type.mop != 2'b01 && insn.vmem_type.mop != 2'b11) begin
+                    ara_req_d.vtype.vsew = EW8;
+                  end else begin
+                    ara_req_d.vtype.vsew = vtype_q.vsew;
+                    ara_req_d.eew_vs2    = EW8;
+                  end
+              end
+              4'b0101: begin
+                  if (insn.vmem_type.mop != 2'b01 && insn.vmem_type.mop != 2'b11) begin
+                    ara_req_d.vtype.vsew = EW16;
+                  end else begin
+                    ara_req_d.vtype.vsew = vtype_q.vsew;
+                    ara_req_d.eew_vs2    = EW16;
+                  end
+              end
+              4'b0110: begin
+                  if (insn.vmem_type.mop != 2'b01 && insn.vmem_type.mop != 2'b11) begin
+                    ara_req_d.vtype.vsew = EW32;
+                  end else begin
+                    ara_req_d.vtype.vsew = vtype_q.vsew;
+                    ara_req_d.eew_vs2    = EW32;
+                  end
+              end
+              4'b0111: begin
+                  if (insn.vmem_type.mop != 2'b01 && insn.vmem_type.mop != 2'b11) begin
+                    ara_req_d.vtype.vsew = EW64;
+                  end else begin
+                    ara_req_d.vtype.vsew = vtype_q.vsew;
+                    ara_req_d.eew_vs2    = EW64;
+                  end
+              end
               default: begin // Invalid. Element is too wide, or encoding is non-existant.
                 acc_req_ready_o  = 1'b1;
                 acc_resp_o.error = 1'b1;
@@ -2295,6 +2419,9 @@ module ara_dispatcher import ara_pkg::*; import rvv_pkg::*; #(
               acc_resp_o.error = ara_resp_i.error;
               acc_resp_valid_o = 1'b1;
               ara_req_valid_d  = 1'b0;
+              // If there is an error, change vstart
+              if (ara_resp_i.error)
+                vstart_d = ara_resp_i.error_vl;
             end
           end
 
