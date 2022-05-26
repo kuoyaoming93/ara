@@ -14,7 +14,7 @@
 #include "Hmat_N32_M16_GF16.h"
 
 //#define VECTOR_EXT
-#define FOR_BACK
+//#define FOR_BACK
 
 //#include "input.h"
 
@@ -241,6 +241,12 @@ int main(void)
 #ifdef FOR_BACK
             // Clean Forward and Backward variables and set value to first and last column
             // Clean R_Aux
+            for(i=0;i<q_field;i++){
+                for(j=0;j<dc;j++)                
+                    printf("%d,",Qmn[i][j]);   
+                printf("\n");
+            }     
+            printf("\n");
             for(j=0;j<dc;j++){
                 for(i=0;i<q_field;i++){        
                     if(j==0)
