@@ -92,6 +92,8 @@ int64_t wires_idx[q_field][q_field] = {
     {480,128,256,448,32,320,416,288,64,224,160,384,352,192,96,0}
 };
 
+int64_t min_vec[32] = {1,1,0,1,1,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0,0,0,1,1,1,0,1,1,0,0,1};
+
 #define VECTOR_EXT
 
 int main(void) 
@@ -104,7 +106,7 @@ int main(void)
     int64_t R_Forward[q_field][dc], R_Backward[q_field][dc], R_Aux[q_field][dc];
     int64_t R_compare, R_compare_2, R_compare_3, R_compare_aux;
     int64_t R_compare_vec[q_field], R_compare_vec2[q_field], R_compare_vec3[q_field];
-    int64_t min_temp, min_temp_2, min_temp_3;
+    int64_t min_temp, min_temp_2, min_temp_3, min3;
     int wires_aux;
     int aux_aux[q_field];
     unsigned long int block_size_p;
@@ -138,7 +140,7 @@ int main(void)
             min_temp = 10000;
             min_temp_2 = 10000;
 
-#ifdef VECTOR_EXT
+#ifndef VECTOR_EXT
             // Load wire index in v0
             asm volatile("addi	t0, zero, %0;" :: "I"(128)); // 64 (int64_t) * 16 (columns) / 8
             asm volatile("vlse64.v v0, (%0), t0;" ::"r"(&wires_idx[0][i])); 
@@ -205,33 +207,181 @@ int main(void)
             R_Backward[i][4-a] = min_temp_2;
         }
         
-        // Standard Min Max
-        for(i=0;i<q_field;i++){
-            min_temp_3 = 10000;
-
+        
+            
 #ifdef VECTOR_EXT
+            #pragma GCC push_options
+            #pragma GCC optimize("O0")
             // Load wire index in v0
+            asm volatile("vmv.v.i v25, 15;"); 
             asm volatile("addi	t0, zero, %0;" :: "I"(128)); // 64 (int64_t) * 16 (columns) / 8
-            asm volatile("vlse64.v v0, (%0), t0;" ::"r"(&wires_idx[0][i])); 
-            asm volatile("addi	t0, zero, %0;" :: "I"(32));  // 64 (int64_t) * 4 (columns) / 8
+            asm volatile("vlse64.v v0, (%0), t0;" ::"r"(&wires_idx[0][0]));          
+            asm volatile("vlse64.v v1, (%0), t0;" ::"r"(&wires_idx[0][1]));
+            asm volatile("vlse64.v v2, (%0), t0;" ::"r"(&wires_idx[0][2]));
+            asm volatile("vlse64.v v3, (%0), t0;" ::"r"(&wires_idx[0][3]));
+            asm volatile("vlse64.v v4, (%0), t0;" ::"r"(&wires_idx[0][4]));
+            asm volatile("vlse64.v v5, (%0), t0;" ::"r"(&wires_idx[0][5]));
+            asm volatile("vlse64.v v6, (%0), t0;" ::"r"(&wires_idx[0][6]));
+            asm volatile("vlse64.v v7, (%0), t0;" ::"r"(&wires_idx[0][7]));   
 
-            /********************************
-             ********** Forward *************
-             *******************************/       
+            // Load R_Backward[wires_aux][a]
+            asm volatile("vluxei64.v v8, (%0), v0;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v9, (%0), v1;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v10, (%0), v2;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v11, (%0), v3;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v12, (%0), v4;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v13, (%0), v5;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v14, (%0), v6;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v15, (%0), v7;" ::"r"(&R_Backward[0][a])); 
+
+            // Load R_Forward[k][a-2]
+            asm volatile("addi	t0, zero, %0;" :: "I"(32));  // 64 (int64_t) * 4 (columns) / 8
+            asm volatile("vlse64.v v16, (%0), t0;" ::"r"(&R_Forward[0][a-2]));
+
+            // Max find
+            asm volatile("vmax.vv v17, v16, v8;");
+            asm volatile("vmax.vv v18, v16, v9;");
+            asm volatile("vmax.vv v19, v16, v10;");
+            asm volatile("vmax.vv v20, v16, v11;");
+            asm volatile("vmax.vv v21, v16, v12;");
+            asm volatile("vmax.vv v22, v16, v13;");
+            asm volatile("vmax.vv v23, v16, v14;");
+            asm volatile("vmax.vv v24, v16, v15;");
+
+            // Min find
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v0, v17, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v1, v18, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v2, v19, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v3, v20, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v4, v21, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v5, v22, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v6, v23, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v7, v24, v25;"); 
+            printf("HOLA\n");
+
+            // Store 
+            asm volatile("vse64.v v0, (%0);" ::"r"(&R_compare_vec3[0]));
+            asm volatile("vse64.v v1, (%0);" ::"r"(&R_compare_vec3[1]));
+            asm volatile("vse64.v v2, (%0);" ::"r"(&R_compare_vec3[2]));
+            asm volatile("vse64.v v3, (%0);" ::"r"(&R_compare_vec3[3]));
+            asm volatile("vse64.v v4, (%0);" ::"r"(&R_compare_vec3[4]));
+            asm volatile("vse64.v v5, (%0);" ::"r"(&R_compare_vec3[5]));
+            asm volatile("vse64.v v6, (%0);" ::"r"(&R_compare_vec3[6]));
+            asm volatile("vse64.v v7, (%0);" ::"r"(&R_compare_vec3[7]));
+
+            // Load wire index in v0
+            asm volatile("vmv.v.i v25, 15;"); 
+            asm volatile("addi	t0, zero, %0;" :: "I"(128)); // 64 (int64_t) * 16 (columns) / 8
+            asm volatile("vlse64.v v0, (%0), t0;" ::"r"(&wires_idx[0][8]));          
+            asm volatile("vlse64.v v1, (%0), t0;" ::"r"(&wires_idx[0][9]));
+            asm volatile("vlse64.v v2, (%0), t0;" ::"r"(&wires_idx[0][10]));
+            asm volatile("vlse64.v v3, (%0), t0;" ::"r"(&wires_idx[0][11]));
+            asm volatile("vlse64.v v4, (%0), t0;" ::"r"(&wires_idx[0][12]));
+            asm volatile("vlse64.v v5, (%0), t0;" ::"r"(&wires_idx[0][13]));
+            asm volatile("vlse64.v v6, (%0), t0;" ::"r"(&wires_idx[0][14]));
+            asm volatile("vlse64.v v7, (%0), t0;" ::"r"(&wires_idx[0][15]));   
+
+            // Load R_Backward[wires_aux][a]
+            asm volatile("vluxei64.v v8, (%0), v0;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v9, (%0), v1;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v10, (%0), v2;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v11, (%0), v3;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v12, (%0), v4;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v13, (%0), v5;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v14, (%0), v6;" ::"r"(&R_Backward[0][a])); 
+            asm volatile("vluxei64.v v15, (%0), v7;" ::"r"(&R_Backward[0][a])); 
+
+            // Load R_Forward[k][a-2]
+            asm volatile("addi	t0, zero, %0;" :: "I"(32));  // 64 (int64_t) * 4 (columns) / 8
+            asm volatile("vlse64.v v16, (%0), t0;" ::"r"(&R_Forward[0][a-2]));
+
+            // Max find
+            asm volatile("vmax.vv v17, v16, v8;");
+            asm volatile("vmax.vv v18, v16, v9;");
+            asm volatile("vmax.vv v19, v16, v10;");
+            asm volatile("vmax.vv v20, v16, v11;");
+            asm volatile("vmax.vv v21, v16, v12;");
+            asm volatile("vmax.vv v22, v16, v13;");
+            asm volatile("vmax.vv v23, v16, v14;");
+            asm volatile("vmax.vv v24, v16, v15;");
+
+            // Min find
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v0, v17, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v1, v18, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v2, v19, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v3, v20, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v4, v21, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v5, v22, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v6, v23, v25;"); 
+            printf("HOLA\n");
+            asm volatile("vredmin.vs v7, v24, v25;"); 
+
+            // Store 
+            asm volatile("vse64.v v0, (%0);" ::"r"(&R_compare_vec3[8]));
+            asm volatile("vse64.v v1, (%0);" ::"r"(&R_compare_vec3[9]));
+            asm volatile("vse64.v v2, (%0);" ::"r"(&R_compare_vec3[10]));
+            asm volatile("vse64.v v3, (%0);" ::"r"(&R_compare_vec3[11]));
+            asm volatile("vse64.v v4, (%0);" ::"r"(&R_compare_vec3[12]));
+            asm volatile("vse64.v v5, (%0);" ::"r"(&R_compare_vec3[13]));
+            asm volatile("vse64.v v6, (%0);" ::"r"(&R_compare_vec3[14]));
+            asm volatile("vse64.v v7, (%0);" ::"r"(&R_compare_vec3[15]));
+
+            for(k=0;k<q_field;k++){
+                R_Aux[k][a-1] = R_compare_vec3[k];
+                printf("%d\t%d\n",min_vec[((a-2)*16+k)],R_compare_vec3[k]);
+            }
+
+            #pragma GCC pop_options
+            /*#pragma GCC push_options
+            #pragma GCC optimize("O0")
+            for(i=0;i<q_field;i++){
+            min3 = 10000;
+            // Load wire index in v0
+            asm volatile("vmv.v.i v10, 15;"); 
+            asm volatile("addi	t0, zero, %0;" :: "I"(128)); // 64 (int64_t) * 16 (columns) / 8
+            asm volatile("vlse64.v v0, (%0), t0;" ::"r"(&wires_idx[0][i]));             
+
             // Load R_Backward[wires_aux][a]
             asm volatile("vluxei64.v v2, (%0), v0;" ::"r"(&R_Backward[0][a])); 
             // Load R_Forward[k][a-2]
+            asm volatile("addi	t0, zero, %0;" :: "I"(32));  // 64 (int64_t) * 4 (columns) / 8
             asm volatile("vlse64.v v4, (%0), t0;" ::"r"(&R_Forward[0][a-2]));
             // Max find
             asm volatile("vmax.vv v6, v2, v4;");
             // Store 
-            asm volatile("vse64.v v6, (%0);" ::"r"(R_compare_vec3));
-
+            //asm volatile("vse64.v v6, (%0);" ::"r"(R_compare_vec3));
+            
             // Search minimum
-            for(k=0;k<q_field;k++)
-                if(R_compare_vec3[k] < min_temp_3)
-                    min_temp_3 = R_compare_vec3[k];
+            //printf("Hola\n");
+            asm volatile("vredmin.vs v8, v6, v10;"); 
+            asm volatile("vse64.v v8, (%0);" ::"r"(R_compare_vec3));
+            /*for(k=0;k<q_field;k++){
+                if(R_compare_vec3[k] < min3){
+                    min3 = R_compare_vec3[k];
+                }
+            }
+            R_Aux[i][a-1] = R_compare_vec3[0];*/
+            
+            //printf("%d\t%d\t%d\n",((a-2)*16+i),min_vec[((a-2)*16+i)],min3);*/
 #else
+        // Standard Min Max
+        for(i=0;i<q_field;i++){
+            min_temp_3 = 10000;        
             // Search maximum
             for(k=0;k<q_field;k++){
                 wires_aux = wires[k][i];
@@ -241,11 +391,11 @@ int main(void)
                         R_compare_3 = R_Backward[wires_aux][a];
                 // Search minimum
                 if(R_compare_3 < min_temp_3)
-                    min_temp_3 = R_compare_3;
+                    min_temp_3 = R_compare_3;                
             }        
+            R_Aux[i][a-1] = min_temp_3;        
+        }    
 #endif            
-            R_Aux[i][a-1] = min_temp_3;
-        } 
     }
 
 #ifndef VECTOR_EXT
@@ -273,12 +423,12 @@ int main(void)
     // Print
     int error = 0;
     for(i=0;i<q_field;i++){
-        for(j=0;j<dc;j++)
-            if(result[i][j] != R_Aux[i][j]){
+        for(j=0;j<dc;j++){
+            if(result[i][j] != R_Aux[i][j])
                 error = 1;
-                //printf("%d\t%d\n",result[i][j], R_Aux[i][j]);
-            }
-        printf("\n");
+            //printf("%d\t%d\n",result[i][j], R_Aux[i][j]);
+        }
+        //printf("\n");
     }
 
     if(error ==1)
